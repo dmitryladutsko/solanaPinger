@@ -1,5 +1,4 @@
 import asyncio
-import logging
 
 from aiohttp import ClientSession
 from aiohttp.client import _RequestContextManager
@@ -10,8 +9,7 @@ from constants import *
 
 class BinanceAPI:
     def __init__(self):
-        self.telegram_token = TELEGRAM_TOKEN
-        self.chat_id = CHAT_ID
+        self.chats = CHATS
         self.currency = CURRENCY
 
     @staticmethod
@@ -50,28 +48,23 @@ class BinanceAPI:
 
         return int(float(ticker_price["price"]))
 
-    async def gather_concurrent_tasks(self) -> None:
-        tasks = list()
-
-        async with ClientSession() as http_session:
-            task = self.fetch_currency_rate(http_session)
-            tasks.append(task)
-            result = await asyncio.gather(*tasks)
-
-            for data in result:
-                if not data:
-                    logging.warning(
-                        f"API response is {data} for one or more currencies in fetch_currency_rate"
-                    )
-
     async def send_currency_rate(self):
         bot = Bot(token=TELEGRAM_TOKEN)
 
         async with ClientSession() as http_session:
             rate = await self.fetch_currency_rate(http_session=http_session)
-            await bot.send_message(chat_id=CHAT_ID, text=f'{str(rate)}$')
+            for chat in CHATS.split(','):
+                await bot.send_message(
+                    chat_id=chat,
+                    text=f'{str(rate)}$'
+                )
+
+    async def start_sending_currency_rate(self):
+        while True:
+            await self.send_currency_rate()
+            await asyncio.sleep(SLEEP_TIME)
 
 
 if __name__ == "__main__":
     api = BinanceAPI()
-    asyncio.run(api.send_currency_rate())
+    asyncio.run(api.start_sending_currency_rate())
